@@ -1,0 +1,27 @@
+{
+  "name": "dnd-ai-dm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A D&D-style tabletop RPG with an AI Dungeon Master. Solo or multiplayer.",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace @dnd/server",
+    "dev:client": "npm run dev --workspace @dnd/client",
+    "build": "npm run build --workspace @dnd/client",
+    "test": "npm run test --workspace @dnd/server",
+    "typecheck": "npm run typecheck --workspace @dnd/server && npm run typecheck --workspace @dnd/client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

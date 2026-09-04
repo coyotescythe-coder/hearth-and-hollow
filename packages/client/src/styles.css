@@ -1,0 +1,299 @@
+/*
+ * Deliberately minimal placeholder styling — enough to play and debug, not a
+ * finished design. The visual pass is Codex's; see AGENTS.md § UI/UX brief.
+ */
+
+:root {
+  color-scheme: dark;
+  --bg: #14120f;
+  --panel: #1e1b16;
+  --ink: #e8e2d4;
+  --muted: #9c9382;
+  --accent: #c9a227;
+  --warn: #d97a5a;
+  font-family: system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.centered {
+  max-width: 34rem;
+  margin: 3rem auto;
+}
+
+.panel {
+  background: var(--panel);
+  padding: 1.5rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 0.25rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #3a342a;
+  background: #12100d;
+  color: var(--ink);
+}
+
+button {
+  cursor: pointer;
+  background: var(--accent);
+  color: #1a1710;
+  border: none;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.row > button {
+  flex: 1;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.warn {
+  color: var(--warn);
+}
+
+fieldset {
+  border: 1px solid #3a342a;
+  border-radius: 6px;
+}
+
+.ability-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.ability-row span:first-child {
+  flex: 1;
+}
+
+.banner {
+  background: var(--warn);
+  color: #201009;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+/* --- play screen --- */
+
+.top-bar {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid #302a22;
+}
+
+.status {
+  margin-left: auto;
+  font-size: 0.8rem;
+}
+
+.status.open {
+  color: #7fa86a;
+}
+
+.status.closed,
+.status.connecting {
+  color: var(--warn);
+}
+
+.play-area {
+  flex: 1;
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  min-height: 0;
+}
+
+.story {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chat-log {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-right: 0.5rem;
+}
+
+.feed-item {
+  line-height: 1.55;
+  max-width: 62ch;
+}
+
+.feed-item.dm {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.05rem;
+}
+
+.feed-item.player {
+  color: #b9cfe0;
+}
+
+.feed-item.system {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.feed-item.roll {
+  font-size: 0.9rem;
+  background: #221f19;
+  border-left: 3px solid var(--accent);
+  padding: 0.35rem 0.6rem;
+  border-radius: 3px;
+}
+
+.outcome-critical-success {
+  border-left-color: #7fa86a;
+}
+
+.outcome-critical-failure,
+.outcome-failure {
+  border-left-color: var(--warn);
+}
+
+.action-bar {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+}
+
+.action-bar input {
+  flex: 1;
+}
+
+.sidebar {
+  width: 17rem;
+  flex-shrink: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sidebar-section {
+  background: var(--panel);
+  padding: 0.75rem;
+  border-radius: 6px;
+}
+
+.hp-bar {
+  height: 8px;
+  background: #3a2020;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hp-fill {
+  height: 100%;
+  background: #7fa86a;
+}
+
+.abilities,
+.party,
+.initiative {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+}
+
+.abilities li {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.abilities li span:first-child {
+  width: 2.5rem;
+}
+
+.initiative li {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.2rem 0.3rem;
+  font-size: 0.9rem;
+  border-radius: 3px;
+}
+
+.initiative li.current {
+  background: #33301f;
+  outline: 1px solid var(--accent);
+}
+
+.initiative li.down {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.init {
+  width: 1.5rem;
+  color: var(--muted);
+}
+
+.waiting {
+  color: var(--accent);
+}
+
+@media (max-width: 800px) {
+  .play-area {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+  }
+}
