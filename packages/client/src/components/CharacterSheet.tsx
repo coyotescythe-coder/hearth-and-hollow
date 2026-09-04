@@ -5,36 +5,103 @@ import {
   formatModifier,
   type Character,
 } from "@dnd/shared";
-
+import { classIcons, Icon } from "./Icon.js";
+import { useHitEffect } from "../hooks/useHitEffect.js";
 export function CharacterSheet({ character }: { character: Character }) {
-  const hpPct = Math.max(0, Math.round((character.hpCurrent / character.hpMax) * 100));
-
+  const hit = useHitEffect(character.hpCurrent);
+  const hpPct = Math.min(
+    100,
+    Math.max(0, (character.hpCurrent / character.hpMax) * 100),
+  );
   return (
-    <section className="sidebar-section">
-      <h3>
-        {character.name} <span className="muted">lvl {character.level} {character.cls}</span>
-      </h3>
-
-      <div className="hp-bar" aria-label={`Hit points ${character.hpCurrent} of ${character.hpMax}`}>
-        <div className="hp-fill" style={{ width: `${hpPct}%` }} />
+    <section
+      className={`character-sheet ${hit ? "is-hit" : ""}`}
+      aria-label="Your character"
+    >
+      <div className="section-heading">
+        <span className="eyebrow">Your character</span>
+        <span className="level-mark">
+          {String(character.level).padStart(2, "0")}
+        </span>
       </div>
-      <p className="muted">
-        HP {character.hpCurrent}/{character.hpMax} · AC {character.ac}
-      </p>
-
-      <ul className="abilities">
+      <div className="character-identity">
+        <div className="portrait-seal">
+          <Icon name={classIcons[character.cls]} />
+        </div>
+        <h2>{character.name}</h2>
+        <p className="eyebrow">
+          Level {character.level} · {character.cls}
+        </p>
+      </div>
+      <div className="vitality">
+        <div>
+          <span>
+            <Icon name="heart" /> Vitality
+          </span>
+          <strong>
+            {character.hpCurrent}
+            <small> / {character.hpMax}</small>
+          </strong>
+        </div>
+        <div
+          className="hp-bar"
+          role="meter"
+          aria-label="Hit points"
+          aria-valuemin={0}
+          aria-valuemax={character.hpMax}
+          aria-valuenow={character.hpCurrent}
+        >
+          <div className="hp-fill" style={{ width: `${hpPct}%` }} />
+        </div>
+        {hit && (
+          <span key={hit.key} className="damage-number" role="status">
+            −{hit.amount} HP
+          </span>
+        )}
+      </div>
+      <div className="armor-stat">
+        <Icon name="shield" />
+        <span>Armor class</span>
+        <strong>{character.ac}</strong>
+      </div>
+      <div className="section-heading">
+        <span className="eyebrow">Abilities</span>
+        <span className="muted small">Score / modifier</span>
+      </div>
+      <dl className="abilities">
         {ABILITIES.map((a) => (
-          <li key={a}>
-            <span>{ABILITY_LABELS[a].slice(0, 3).toUpperCase()}</span>
-            <strong>{character.abilities[a]}</strong>
-            <span className="muted">{formatModifier(abilityModifier(character.abilities[a]))}</span>
-          </li>
+          <div key={a}>
+            <dt title={ABILITY_LABELS[a]}>
+              {a.toUpperCase()}
+              <span className="sr-only"> — {ABILITY_LABELS[a]}</span>
+            </dt>
+            <dd>
+              {character.abilities[a]}
+              <strong>
+                {formatModifier(abilityModifier(character.abilities[a]))}
+              </strong>
+            </dd>
+          </div>
         ))}
-      </ul>
-
+      </dl>
       {character.conditions.length > 0 && (
-        <p className="warn">Conditions: {character.conditions.join(", ")}</p>
+        <div className="conditions" role="status">
+          {character.conditions.map((c) => (
+            <span key={c}>{c}</span>
+          ))}
+        </div>
       )}
+      {character.notes && (
+        <details className="background-notes">
+          <summary>Before the adventure</summary>
+          <p>{character.notes}</p>
+        </details>
+      )}
+      <div className="sheet-end">
+        <span />
+        <Icon name="spark" />
+        <span />
+      </div>
     </section>
   );
 }

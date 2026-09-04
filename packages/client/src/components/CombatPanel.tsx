@@ -1,23 +1,41 @@
 import type { CombatState } from "@dnd/shared";
-
-/** Only rendered while a fight is on. The server owns this order entirely. */
-export function CombatPanel({ combat }: { combat: CombatState }) {
+import { Icon } from "./Icon.js";
+export function CombatPanel({
+  combat,
+  youCharacterId,
+}: {
+  combat: CombatState;
+  youCharacterId: string | null;
+}) {
   return (
-    <section className="sidebar-section">
-      <h3>
-        Combat <span className="muted">round {combat.round}</span>
-      </h3>
+    <section className="combat-panel" aria-label="Initiative order">
+      <div className="section-heading">
+        <span className="eyebrow">
+          <Icon name="sword" /> Initiative
+        </span>
+        <span className="round">Round {combat.round}</span>
+      </div>
       <ol className="initiative">
         {combat.participants.map((p, idx) => {
-          const isCurrent = idx === combat.currentTurnIdx;
-          const down = p.hpCurrent <= 0;
+          const current = idx === combat.currentTurnIdx;
           return (
-            <li key={p.id} className={`${isCurrent ? "current" : ""} ${down ? "down" : ""}`}>
+            <li
+              key={p.id}
+              className={`${current ? "current" : ""} ${p.hpCurrent <= 0 ? "down" : ""}`}
+              aria-current={current ? "step" : undefined}
+            >
               <span className="init">{p.initiative}</span>
-              <strong>{p.name}</strong>
-              <span className="muted">
-                {down ? " down" : ` ${p.hpCurrent}/${p.hpMax}`} · AC {p.ac}
-              </span>
+              <div>
+                <strong>
+                  {p.name}
+                  {p.characterId === youCharacterId && <small> you</small>}
+                </strong>
+                <span>
+                  {p.hpCurrent <= 0 ? "Down" : `${p.hpCurrent}/${p.hpMax} HP`} ·
+                  AC {p.ac}
+                </span>
+              </div>
+              {current && <Icon name="arrow" />}
             </li>
           );
         })}

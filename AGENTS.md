@@ -5,7 +5,7 @@ automatically**; Claude Code reads `CLAUDE.md`, which points here. Keep this
 file current — it is the shared source of truth so neither tool has to be
 re-briefed from scratch.
 
-Last updated: 2026-09-04, end of the initial build session (Claude, Opus 5).
+Last updated: 2026-09-04, frontend design pass (Codex).
 
 ---
 
@@ -220,6 +220,43 @@ To design combat without playing into a fight, seed one directly in
 
 ## 10. Status
 
+**Frontend design pass complete — Hearth & Hollow.** The scaffold has been
+replaced with a pine/brass/paper visual system, self-hosted Fraunces and Literata,
+original forest engraving and SVG icons, and responsive landing, character
+creation, and play screens. Narration keeps its DOM identity when committed;
+autoscroll pauses when reading earlier prose. Critical rolls, combat mode, turn
+arrival, and HP loss have distinct motion with reduced-motion alternatives.
+Mobile has Story, World/Battle, and Character tabs. Party creation keeps its
+invite visible even before another player joins. Shared/server files are unchanged.
+
+`packages/client/DESIGN.md` documents the design and rehearsal workflow.
+With normal dev running, `npm run dev:story --workspace @dnd/client` opens an
+isolated, in-memory scripted game at **localhost:5180** (server **:8788**).
+It uses `setStreamTurn`, real engine tool calls, and server dice helpers; actions
+`fight`, `nat20`, `nat1`, `hit`, `heal`, and `end` exercise the important moments.
+`UI_VITE_PORT` can override the Vite port used by the rehearsal proxy.
+
+Verified in a browser at desktop and 390px phone widths: solo creation, array
+swapping and derived stats, joining by code, party waiting, narration/input
+locking, reader-controlled autoscroll, natural 20/1, targeted combat actions,
+other-player turn locking, HP loss, combat ending, and reload/resume. Production
+build and both package typechecks pass. Four new client regression tests cover
+stream identity, reconnecting mid-narration, interrupted-stream cleanup, and
+returning to the landing screen when a resumed session has expired:
+`npm run test --workspace @dnd/client`.
+
+**Server test note for the engine owner:** the unchanged 15-test suite produced
+14 passes and one randomized failure in `starting combat does not skip the first
+combatant`. It inspects the current participant *after* auto-resolving NPC turns,
+then expects index 0 whenever that participant is a player. If an NPC won
+initiative, the correct player can be at index 1. Make that test deterministic
+or assert against the original initiative order; no server changes were made here.
+
+The desktop sandbox used for this pass could not enumerate an ancestor directory
+required by esbuild's dependency optimizer. Validation used Vite's runner loader
+for the production build and a temporary filesystem alias for live development;
+those machine-specific accommodations are outside the repository.
+
 Working and verified: session create/join/resume, character creation, action
 queueing, the streaming tool-use loop (integration-tested with a scripted
 model), server-side dice, structured combat with initiative, history
@@ -233,7 +270,7 @@ narrates numbers on its own, tighten the DICE section of `DM_SYSTEM_PROMPT`.
 
 ### Next up
 1. Live playtest with a real key (above).
-2. Frontend design pass (§8).
+2. Fix the randomized combat-start test assertion noted above.
 3. Inventory/equipment and spell slots (columns already exist).
 4. Prompt caching: add `cache_control` breakpoints — the prompt is already
    structured for it (static system, volatile state in the trailing message).

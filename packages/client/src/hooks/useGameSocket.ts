@@ -15,7 +15,7 @@ import {
  */
 
 export type FeedItem =
-  | { kind: "message"; id: string; message: GameMessage }
+  | { kind: "message"; id: string; message: GameMessage; chunks?: string[] }
   | { kind: "roll"; id: string; roll: DiceRoll };
 
 export interface GameState {
@@ -24,6 +24,11 @@ export interface GameState {
   feed: FeedItem[];
   /** Narration arriving right now, before it is persisted. */
   streaming: string;
+  streamId: string | null;
+  streamChunks: string[];
+  pending: boolean;
+  /** Local presentation preference: the protocol deliberately has no solo flag. */
+  partySession: boolean;
   dmThinking: boolean;
   error: string | null;
 }
@@ -33,6 +38,16 @@ const initialState: GameState = {
   snapshot: null,
   feed: [],
   streaming: "",
+  streamId: null,
+  streamChunks: [],
+  pending: false,
+  partySession: (() => {
+    try {
+      return localStorage.getItem("dnd.partySession") === "true";
+    } catch {
+      return false;
+    }
+  })(),
   dmThinking: false,
   error: null,
 };
@@ -40,13 +55,19 @@ const initialState: GameState = {
 type Action =
   | { type: "connection"; value: GameState["connection"] }
   | { type: "server"; message: ServerMessage }
+  | { type: "sending" }
+  | { type: "party_mode"; value: boolean }
   | { type: "clear_error" };
 
 let rollSeq = 0;
 
-function reducer(state: GameState, action: Action): GameState {
-  if (action.type === "connection") return { ...state, connection: action.value };
+export function reducer(state: GameState, action: Action): GameState {
+  if (action.type === "connection")
+    return { ...state, connection: action.value };
   if (action.type === "clear_error") return { ...state, error: null };
+  if (action.type === "sending") return { ...state, pending: true };
+  if (action.type === "party_mode")
+    return { ...state, partySession: action.value };
 
   const message = action.message;
   switch (message.type) {
@@ -54,48 +75,110 @@ function reducer(state: GameState, action: Action): GameState {
       return {
         ...state,
         snapshot: message.snapshot,
-        feed: message.snapshot.messages.map((m) => ({ kind: "message", id: m.id, message: m })),
+        feed: message.snapshot.messages.map((m) => ({
+          kind: "message",
+          id: m.id,
+          message: m,
+        })),
         streaming: "",
+        streamId: null,
+        streamChunks: [],
+        pending: false,
         error: null,
       };
 
     case "narration_start":
-      return { ...state, streaming: "" };
+      return {
+        ...state,
+        dmThinking: true,
+        streaming: "",
+        streamId: message.messageId,
+        streamChunks: [],
+      };
 
     case "narration_delta":
-      return { ...state, streaming: state.streaming + message.text };
+      return {
+        ...state,
+        // A reconnect can join an existing stream without its start event.
+        streamId: message.messageId,
+        dmThinking: true,
+        streaming: state.streaming + message.text,
+        streamChunks: message.text
+          ? [...state.streamChunks, message.text]
+          : state.streamChunks,
+      };
 
     case "narration_end":
       return {
         ...state,
         streaming: "",
-        feed: [...state.feed, { kind: "message", id: message.message.id, message: message.message }],
+        streamId: null,
+        streamChunks: [],
+        feed: [
+          ...state.feed,
+          {
+            kind: "message",
+            id: state.streamId ?? message.message.id,
+            message: message.message,
+            // After reconnecting we may only have the tail of the narration.
+            // The final server message is authoritative; never replace it with
+            // an incomplete collection of animation spans.
+            chunks:
+              state.streamChunks.join("").trim() === message.message.content
+                ? state.streamChunks
+                : undefined,
+          },
+        ],
         snapshot: state.snapshot
-          ? { ...state.snapshot, messages: [...state.snapshot.messages, message.message] }
+          ? {
+              ...state.snapshot,
+              messages: [...state.snapshot.messages, message.message],
+            }
           : state.snapshot,
       };
 
     case "message_added":
-      if (state.feed.some((f) => f.id === message.message.id)) return state;
+      if (
+        state.feed.some(
+          (f) => f.kind === "message" && f.message.id === message.message.id,
+        )
+      )
+        return state;
       return {
         ...state,
-        feed: [...state.feed, { kind: "message", id: message.message.id, message: message.message }],
+        feed: [
+          ...state.feed,
+          { kind: "message", id: message.message.id, message: message.message },
+        ],
+        pending: false,
         snapshot: state.snapshot
-          ? { ...state.snapshot, messages: [...state.snapshot.messages, message.message] }
+          ? {
+              ...state.snapshot,
+              messages: [...state.snapshot.messages, message.message],
+            }
           : state.snapshot,
       };
 
     case "dice_result":
       rollSeq += 1;
-      return { ...state, feed: [...state.feed, { kind: "roll", id: `roll-${rollSeq}`, roll: message.roll }] };
+      return {
+        ...state,
+        feed: [
+          ...state.feed,
+          { kind: "roll", id: `roll-${rollSeq}`, roll: message.roll },
+        ],
+      };
 
     case "character_update":
       if (!state.snapshot) return state;
       return {
         ...state,
+        pending: false,
         snapshot: {
           ...state.snapshot,
-          characters: state.snapshot.characters.some((c) => c.id === message.character.id)
+          characters: state.snapshot.characters.some(
+            (c) => c.id === message.character.id,
+          )
             ? state.snapshot.characters.map((c) =>
                 c.id === message.character.id ? message.character : c,
               )
@@ -119,19 +202,50 @@ function reducer(state: GameState, action: Action): GameState {
 
     case "players_update":
       return state.snapshot
-        ? { ...state, snapshot: { ...state.snapshot, players: message.players } }
+        ? {
+            ...state,
+            snapshot: { ...state.snapshot, players: message.players },
+          }
         : state;
 
     case "awaiting":
       return state.snapshot
-        ? { ...state, snapshot: { ...state.snapshot, awaitingPlayerIds: message.playerIds } }
+        ? {
+            ...state,
+            pending: false,
+            snapshot: {
+              ...state.snapshot,
+              awaitingPlayerIds: message.playerIds,
+            },
+          }
         : state;
 
     case "dm_thinking":
-      return { ...state, dmThinking: message.thinking };
+      return {
+        ...state,
+        dmThinking: message.thinking,
+        pending: false,
+        ...(!message.thinking
+          ? { streaming: "", streamChunks: [], streamId: null }
+          : {}),
+      };
 
     case "error":
-      return { ...state, error: message.message };
+      return {
+        ...state,
+        error: message.message,
+        pending: false,
+        ...(/session has expired/i.test(message.message)
+          ? {
+              snapshot: null,
+              feed: [],
+              streaming: "",
+              streamId: null,
+              streamChunks: [],
+              dmThinking: false,
+            }
+          : {}),
+      };
 
     default:
       return state;
@@ -155,9 +269,9 @@ export function useGameSocket() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const socketRef = useRef<WebSocket | null>(null);
   const queueRef = useRef<ClientMessage[]>([]);
-  const closedByUs = useRef(false);
 
   const send = useCallback((message: ClientMessage) => {
+    dispatch({ type: "sending" });
     const socket = socketRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(message));
@@ -167,7 +281,9 @@ export function useGameSocket() {
   }, []);
 
   useEffect(() => {
-    closedByUs.current = false;
+    // Each effect owns its retry lifecycle. A shared ref lets StrictMode's old
+    // socket schedule a second connection after the next effect has started.
+    let disposed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
 
     const connect = () => {
@@ -177,10 +293,19 @@ export function useGameSocket() {
       dispatch({ type: "connection", value: "connecting" });
 
       socket.onopen = () => {
+        if (disposed) {
+          socket.close();
+          return;
+        }
         dispatch({ type: "connection", value: "open" });
         const stored = readStored();
         if (stored) {
-          socket.send(JSON.stringify({ type: "resume_session", ...stored } satisfies ClientMessage));
+          socket.send(
+            JSON.stringify({
+              type: "resume_session",
+              ...stored,
+            } satisfies ClientMessage),
+          );
         }
         for (const queued of queueRef.current.splice(0)) {
           socket.send(JSON.stringify(queued));
@@ -188,6 +313,7 @@ export function useGameSocket() {
       };
 
       socket.onmessage = (event) => {
+        if (disposed) return;
         const message = JSON.parse(String(event.data)) as ServerMessage;
         if (message.type === "session_state") {
           try {
@@ -209,37 +335,60 @@ export function useGameSocket() {
       };
 
       socket.onclose = () => {
+        if (disposed) return;
         dispatch({ type: "connection", value: "closed" });
-        if (!closedByUs.current) retry = setTimeout(connect, 1500);
+        retry = setTimeout(connect, 1500);
       };
     };
 
     connect();
 
     return () => {
-      closedByUs.current = true;
+      disposed = true;
       if (retry) clearTimeout(retry);
       socketRef.current?.close();
     };
   }, []);
 
+  const rememberMode = useCallback((party: boolean) => {
+    dispatch({ type: "party_mode", value: party });
+    try {
+      localStorage.setItem("dnd.partySession", String(party));
+    } catch {
+      /* storage is optional */
+    }
+  }, []);
+
   const actions = useMemo(
     () => ({
-      createSession: (playerName: string, solo: boolean) =>
-        send({ type: "create_session", playerName, solo }),
-      joinSession: (playerName: string, joinCode: string) =>
-        send({ type: "join_session", playerName, joinCode: joinCode.toUpperCase() }),
-      createCharacter: (input: Omit<Extract<ClientMessage, { type: "create_character" }>, "type">) =>
-        send({ type: "create_character", ...input }),
+      createSession: (playerName: string, solo: boolean) => {
+        rememberMode(!solo);
+        send({ type: "create_session", playerName, solo });
+      },
+      joinSession: (playerName: string, joinCode: string) => {
+        rememberMode(true);
+        send({
+          type: "join_session",
+          playerName,
+          joinCode: joinCode.toUpperCase(),
+        });
+      },
+      createCharacter: (
+        input: Omit<
+          Extract<ClientMessage, { type: "create_character" }>,
+          "type"
+        >,
+      ) => send({ type: "create_character", ...input }),
       act: (text: string) => send({ type: "player_action", text }),
       combatAct: (
         kind: Extract<ClientMessage, { type: "combat_action" }>["kind"],
         targetParticipantId: string | null,
         description: string,
-      ) => send({ type: "combat_action", kind, targetParticipantId, description }),
+      ) =>
+        send({ type: "combat_action", kind, targetParticipantId, description }),
       clearError: () => dispatch({ type: "clear_error" }),
     }),
-    [send],
+    [send, rememberMode],
   );
 
   return { state, actions };
