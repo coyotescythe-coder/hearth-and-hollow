@@ -14,7 +14,7 @@
     "dev:server": "npm run dev --workspace @dnd/server",
     "dev:client": "npm run dev --workspace @dnd/client",
     "build": "npm run build --workspace @dnd/client",
-    "test": "npm run test --workspace @dnd/server",
+    "test": "npm run test --workspace @dnd/server && npm run test --workspace @dnd/client",
     "typecheck": "npm run typecheck --workspace @dnd/server && npm run typecheck --workspace @dnd/client"
   },
   "devDependencies": {

@@ -154,16 +154,19 @@ test("starting combat does not skip the first combatant", async () => {
   assert.equal(combat.participants.length, 2);
   assert.equal(combat.round, 1);
 
-  // Whoever won initiative is still up — the fight must not have advanced past
-  // the top of the order just because a DM turn completed.
-  const first = combat.participants[combat.currentTurnIdx]!;
-  if (first.isNpc) {
-    // An NPC winning initiative means the engine auto-ran its turn and then
-    // handed control to the player, so the player must now be current.
-    assert.equal(combat.participants[combat.currentTurnIdx]!.isNpc, false);
-  } else {
-    assert.equal(combat.currentTurnIdx, 0);
-  }
+  // Initiative uses real dice, so either side may win the roll. The invariant
+  // holds either way: control comes to rest on the player, having auto-resolved
+  // any NPCs ahead of them and skipped nobody.
+  //
+  // Player wins initiative  -> idx 0, untouched (combat had only just started).
+  // Goblin wins initiative  -> its turn is auto-run, then control lands on idx 1.
+  const playerIdx = combat.participants.findIndex((p) => !p.isNpc);
+  assert.equal(
+    combat.currentTurnIdx,
+    playerIdx,
+    "combat must advance to the player without skipping whoever won initiative",
+  );
+  assert.equal(combat.participants[combat.currentTurnIdx]!.isNpc, false);
 });
 
 test("out-of-turn actions are rejected during combat", async () => {
