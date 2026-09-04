@@ -120,36 +120,85 @@ campaign viable rather than one that degrades after an hour.
 
 ## 8. UI/UX brief — Codex's scope
 
-The client today is a **functional scaffold with placeholder styling**. Every
-screen exists and is correctly wired to real server state; none of it is
-designed. Turning it into the real UI is the frontend workstream.
+**You have a free hand on the design.** Everything in `packages/client` that is
+visual is yours: art direction, typography, colour, layout, spacing, motion,
+iconography, custom assets, component structure, and any UI-only dependencies
+you want to pull in. What exists today is a deliberately plain scaffold that
+proves the wiring — it is a starting point to replace, not a design to respect.
+Delete `styles.css` and start over if that serves you. Restructure or rename
+components freely.
 
-Screens: **Landing** (name → solo / create party / join by code) → **Character
-creation** (name, class, standard-array assignment with live modifiers, derived
-HP/AC, optional background) → **Play screen**.
+### The bar
 
-Play screen regions:
-- Top bar: invite code (party sessions only), current location, connection state
-- Main column: narration log — DM prose visually distinct from player and
-  system lines; dice results rendered as their own inline artifacts
-- Bottom: action bar — free-form input, which swaps to a compact
-  action/target menu when it is your turn in a fight
-- Right sidebar: your character sheet (HP bar, AC, abilities, conditions);
-  the initiative tracker while combat is on; the party panel (auto-hidden solo)
+This should look like someone designed it on purpose. A competent dark theme
+over default form controls is not the goal — the goal is a game that feels like
+a place. Someone should be able to screenshot the play screen and have it read
+as a real product, not a demo.
 
-Suggested direction (not binding): atmospheric and book-like rather than a
-generic SaaS chat — dark ground, serif for DM narration, sans for interface
-chrome, so "the world" and "the app" read differently. Get layout and streaming
-right before theming.
+The one thing worth optimising for: **this app is mostly text**, and text is
+the entire experience. Narration is what the player is here for. Typography,
+measure, rhythm, and how prose enters the screen matter more here than in a
+typical dashboard.
 
-**Rules for the frontend work:**
-- No game logic on the client. It renders server-pushed state; it does not
-  compute outcomes. Derived-stat helpers in `@dnd/shared` (`abilityModifier`,
-  `maxHpFor`) are shared deliberately so both sides agree.
-- Treat `packages/shared/src/protocol.ts` as a contract. Changing it means
-  changing the server too — coordinate rather than reshaping it client-side.
-- `useGameSocket.ts` owns the socket, reconnect, and state merging. Components
-  should stay presentational.
+### Moments that deserve real attention
+
+These are where the game either feels alive or feels like a chat log:
+
+- **Narration streaming in.** Text arrives token by token (`narration_delta`).
+  How it lands sets the pace of the whole game.
+- **A die hitting the table.** `dice_result` carries the expression, every face
+  rolled, which die was kept on advantage, the DC, and the outcome. A natural
+  20 and a natural 1 are already flagged (`critical-success` /
+  `critical-failure`) and should feel completely different from each other.
+- **Combat starting.** The initiative order appears and the whole screen should
+  change character — the game just shifted mode.
+- **Your turn arriving** in a fight, versus watching someone else's.
+- **Taking damage.** HP changes push down from the server; the sheet should
+  register the hit.
+- **Waiting on the party** in multiplayer, versus playing solo where there is
+  nobody to wait for.
+
+### Screens (what they must let a player do — not how they must look)
+
+1. **Landing** — choose a name; start solo, create a party session, or join by
+   six-character code.
+2. **Character creation** — name, class, assign the standard array across six
+   abilities with live modifiers, see derived HP/AC, optional background text.
+3. **Play** — read narration, act (free-form, or pick an action and target on
+   your turn in combat), see your character, see the initiative order during a
+   fight, see the party when there is one, know the connection state, and find
+   the invite code in a party session.
+
+### Inviolable — the parts that are not design decisions
+
+- **No game logic on the client.** It renders server-pushed state; it never
+  computes outcomes, HP, or whose turn it is. The shared helpers
+  (`abilityModifier`, `maxHpFor`) exist so both sides agree — use them, don't
+  reimplement rules.
+- **`packages/shared/src/protocol.ts` is a contract with the server.** If the
+  UI genuinely needs a field the protocol doesn't carry, that's a server change
+  to coordinate, not something to work around client-side.
+- **`useGameSocket.ts` owns the socket**, reconnect, and state merging. Reshape
+  its return value if that helps, but don't scatter socket handling into
+  components.
+- Behaviours that are easy to break and will be noticed: autoscroll as
+  narration streams; inputs disabled while the DM is mid-turn; the party panel
+  hidden entirely in solo; out-of-turn combat actions blocked; the reconnect
+  state visible when the socket drops.
+- Keep it usable on a laptop and a phone, keyboard-navigable, and readable —
+  contrast and focus states are part of the design, not a lint pass afterwards.
+
+### Practical
+
+`npm run dev` runs server and client together. The server can run without an
+API key — you'll get a system message instead of narration, which is fine for
+building most screens. For live narration you need a key in `.env`.
+
+To design combat without playing into a fight, seed one directly in
+`data/game.db`, or temporarily script the DM: `setStreamTurn` in
+`game/engine.ts` is the seam the tests use to drive scripted tool calls
+(`start_combat`, `roll_check`) with no API involved — see
+`src/game/engine.test.ts` for working examples.
 
 ## 9. Gotchas already paid for
 
